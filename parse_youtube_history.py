@@ -1,8 +1,10 @@
 import re
 import os
+import time
 from bs4 import BeautifulSoup
 from datetime import datetime
 from collections import Counter, defaultdict
+from tqdm import tqdm
 
 # Mapeamento dos meses em português para abreviações em inglês
 meses = {
@@ -38,13 +40,17 @@ def parse_html(file_path):
     Retorna uma lista de dicionários com as chaves:
       'video_title', 'video_link', 'channel_name', 'channel_link', 'view_date' (datetime) e 'view_date_str'
     """
+    start_time = time.time()
+
     with open(file_path, encoding="utf-8") as f:
         soup = BeautifulSoup(f, "html.parser")
     
     registros = []
     
     # Cada registro está em um bloco com classe "outer-cell"
-    for outer in soup.find_all("div", class_="outer-cell"):
+    # for outer in soup.find_all("div", class_="outer-cell"):
+    outer_cells = soup.find_all("div", class_="outer-cell")
+    for outer in tqdm(outer_cells, desc="Processando registros", unit="registro"):
         # Procura dentro do bloco a célula de conteúdo que contém as informações
         content_cells = outer.find_all("div", class_="content-cell")
         if not content_cells:
@@ -90,6 +96,12 @@ def parse_html(file_path):
             "view_date": view_date,
             "view_date_str": view_date_str
         })
+
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    minutes = int(elapsed_time // 60)
+    seconds = elapsed_time % 60
+    print(f"Tempo de execução: {minutes} minutos e {seconds:.2f} segundos")
     
     return registros
 
@@ -101,18 +113,18 @@ def save_summary(registros, out_path):
     with open(out_path, "w", encoding="utf-8") as f:
         f.write("<html><head><meta charset='UTF-8'><title>Histórico Resumido</title></head><body>\n")
         for reg in registros:
-            linha = (f"Título: {reg['video_title']}<br>"
-                     f"Link: {reg['video_link']}<br>"
-                     f"Canal: {reg['channel_name']}<br>"
-                     f"Canal Link: {reg['channel_link']}<br>"
-                     f"Data: {reg['view_date_str']}<br><hr>\n")
+            # linha = (f"Título: {reg['video_title']}<br>"
+            #          f"Link: {reg['video_link']}<br>"
+            #          f"Canal: {reg['channel_name']}<br>"
+            #          f"Canal Link: {reg['channel_link']}<br>"
+            #          f"Data: {reg['view_date_str']}<br><hr>\n")
             
-            # linha = (f"Título: {reg['video_title']}<br>\n"
-            #          f"Link: {reg['video_link']}<br>\n"
-            #          f"Canal: {reg['channel_name']}<br>\n"
-            #          f"Canal Link: {reg['channel_link']}<br>\n"
-            #          f"Data: {reg['view_date_str']}<br>\n"
-            #          f"<hr>\n")
+            linha = (f"Título: {reg['video_title']}<br>\n"
+                     f"Link: {reg['video_link']}<br>\n"
+                     f"Canal: {reg['channel_name']}<br>\n"
+                     f"Canal Link: {reg['channel_link']}<br>\n"
+                     f"Data: {reg['view_date_str']}<br>\n"
+                     f"<hr>\n")
 
             f.write(linha)
         f.write("</body></html>")
@@ -128,8 +140,10 @@ def load_summary(summary_path):
     
     # Divide o conteúdo do body usando a tag <hr> como separador
     conteudo = soup.body.decode_contents()
-    blocos = conteudo.split("<hr>")
-    for bloco in blocos:
+    # blocos = conteudo.split("<hr>")
+    blocos = [b for b in conteudo.split("<hr>") if b.strip()]
+    # for bloco in blocos:
+    for bloco in tqdm(blocos, desc="Carregando registros", unit="registro"):
         bloco = bloco.strip()
         if not bloco:
             continue
@@ -368,25 +382,15 @@ def menu(registros):
         else:
             print("Opção inválida. Tente novamente.")
 
-# if __name__ == "__main__":
-    
-#     file_path = os.path.join('Takeout', 'YouTube e YouTube Music', 'histórico', 'histórico-de-visualização.html')
-
-#     registros = parse_html(file_path)
-#     if registros:
-#         print(f"Foram encontrados {len(registros)} registros.")
-#         menu(registros)
-#     else:
-#         print("Nenhum registro foi encontrado no arquivo.")
-
-
 if __name__ == "__main__":
     # Caminho para o arquivo de resumo na raiz do projeto
-    summary_path = "histórico-de-visualização.html"
+    summary_path = "histórico-de-visualização-resumido.html"
     
     # Se o resumo ainda não existe, lê o arquivo original, gera os registros e salva o resumo.
     if not os.path.exists(summary_path):
         original_path = os.path.join('Takeout', 'YouTube e YouTube Music', 'histórico', 'histórico-de-visualização.html')
+        # original_path = "histórico-de-visualização-cortado.html"
+        print("Iniciando análise")
         registros = parse_html(original_path)
         if registros:
             print(f"\nForam encontrados {len(registros)} registros no arquivo original.")
@@ -397,6 +401,7 @@ if __name__ == "__main__":
             registros = []
     else:
         # Se o resumo já existe, carrega os registros a partir dele.
+        print("Iniciando análise com os dados resumidos")
         registros = load_summary(summary_path)
         print(f"\nForam carregados {len(registros)} registros a partir do resumo.")
     
