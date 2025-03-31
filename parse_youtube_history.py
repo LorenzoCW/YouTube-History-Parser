@@ -5,6 +5,7 @@ from bs4 import BeautifulSoup
 from datetime import datetime
 from collections import Counter, defaultdict
 from tqdm import tqdm
+from multiprocessing import Pool
 
 # Mapeamento dos meses em português para abreviações em inglês
 meses = {
@@ -34,68 +35,65 @@ def converter_data(data_str):
             print(f"Erro ao converter data '{data_formatada}': {e}")
     return None
 
+def parse_single_record(cell_html):
+    """ Processa um único registro para extração de dados. """
+    
+    outer = BeautifulSoup(cell_html, "lxml")
+    
+    content_cells = outer.find_all("div", class_="content-cell")
+    if not content_cells:
+        return None
+    
+    body_cell = next((cell for cell in content_cells if "mdl-typography--body-1" in cell.get("class", [])), None)
+    if not body_cell:
+        return None
+
+    video_link_tag = body_cell.find("a", href=re.compile("https://www.youtube.com/watch"))
+    if not video_link_tag:
+        return None
+
+    video_title = video_link_tag.text.strip()
+    video_link = video_link_tag.get("href")
+    
+    channel_link_tag = video_link_tag.find_next("a", href=re.compile("https://www.youtube.com/channel"))
+    channel_name = channel_link_tag.text.strip() if channel_link_tag else ""
+    channel_link = channel_link_tag.get("href") if channel_link_tag else ""
+    
+    texto_restante = video_link_tag.parent.get_text(separator=" ", strip=True)
+    data_match = re.search(r'\d+\s+de\s+\w+\.\s+de\s+\d+,\s+\d+:\d+:\d+', texto_restante)
+    view_date_str = data_match.group(0) if data_match else ""
+    view_date = converter_data(view_date_str) if view_date_str else None
+
+    return {
+        "video_title": video_title,
+        "video_link": video_link,
+        "channel_name": channel_name,
+        "channel_link": channel_link,
+        "view_date": view_date,
+        "view_date_str": view_date_str
+    }
+
 def parse_html(file_path):
     """
     Lê o arquivo HTML do histórico e extrai os dados de cada visualização.
     Retorna uma lista de dicionários com as chaves:
       'video_title', 'video_link', 'channel_name', 'channel_link', 'view_date' (datetime) e 'view_date_str'
     """
+
     start_time = time.time()
 
     with open(file_path, encoding="utf-8") as f:
-        soup = BeautifulSoup(f, "html.parser")
+        soup = BeautifulSoup(f, "lxml")  # Usando lxml para maior desempenho
+  
+    # Converter os outer_cells para strings
+    outer_cells = [str(cell) for cell in soup.find_all("div", class_="outer-cell")]
     
-    registros = []
-    
-    # Cada registro está em um bloco com classe "outer-cell"
-    # for outer in soup.find_all("div", class_="outer-cell"):
-    outer_cells = soup.find_all("div", class_="outer-cell")
-    for outer in tqdm(outer_cells, desc="Processando registros", unit="registro"):
-        # Procura dentro do bloco a célula de conteúdo que contém as informações
-        content_cells = outer.find_all("div", class_="content-cell")
-        if not content_cells:
-            continue
-        # O primeiro content-cell com classe "mdl-typography--body-1" normalmente contém os dados
-        body_cell = None
-        for cell in content_cells:
-            if "mdl-typography--body-1" in cell.get("class", []):
-                body_cell = cell
-                break
-        if not body_cell:
-            continue
+    # Uso de multiprocessing para processar os registros em paralelo
+    with Pool() as pool:
+        registros = list(tqdm(pool.imap(parse_single_record, outer_cells), total=len(outer_cells), desc="Processando registros", unit="registro"))
 
-        # Extração do vídeo: primeiro link dentro do texto (após a palavra "Watched")
-        video_link_tag = body_cell.find("a", href=re.compile("https://www.youtube.com/watch"))
-        if not video_link_tag:
-            continue
-        video_title = video_link_tag.text.strip()
-        video_link = video_link_tag.get("href")
-        
-        # Extração do canal: próximo link que geralmente é o segundo <a>
-        channel_link_tag = video_link_tag.find_next("a", href=re.compile("https://www.youtube.com/channel"))
-        if channel_link_tag:
-            channel_name = channel_link_tag.text.strip()
-            channel_link = channel_link_tag.get("href")
-        else:
-            channel_name = ""
-            channel_link = ""
-        
-        # Extração da data: após o canal, pode estar no mesmo cell ou em um texto separado.
-        # Tentamos pegar o texto restante que contenha a data
-        texto_restante = video_link_tag.parent.get_text(separator=" ", strip=True)
-        # Procura uma data com o padrão "de <mês> de"
-        data_match = re.search(r'\d+\s+de\s+\w+\.\s+de\s+\d+,\s+\d+:\d+:\d+', texto_restante)
-        view_date_str = data_match.group(0) if data_match else ""
-        view_date = converter_data(view_date_str) if view_date_str else None
-        
-        registros.append({
-            "video_title": video_title,
-            "video_link": video_link,
-            "channel_name": channel_name,
-            "channel_link": channel_link,
-            "view_date": view_date,
-            "view_date_str": view_date_str
-        })
+    # Remove registros None (caso algum registro não tenha sido encontrado)
+    registros = [registro for registro in registros if registro is not None]
 
     end_time = time.time()
     elapsed_time = end_time - start_time
@@ -112,13 +110,7 @@ def save_summary(registros, out_path):
     """
     with open(out_path, "w", encoding="utf-8") as f:
         f.write("<html><head><meta charset='UTF-8'><title>Histórico Resumido</title></head><body>\n")
-        for reg in registros:
-            # linha = (f"Título: {reg['video_title']}<br>"
-            #          f"Link: {reg['video_link']}<br>"
-            #          f"Canal: {reg['channel_name']}<br>"
-            #          f"Canal Link: {reg['channel_link']}<br>"
-            #          f"Data: {reg['view_date_str']}<br><hr>\n")
-            
+        for reg in registros:            
             linha = (f"Título: {reg['video_title']}<br>\n"
                      f"Link: {reg['video_link']}<br>\n"
                      f"Canal: {reg['channel_name']}<br>\n"
@@ -388,7 +380,7 @@ if __name__ == "__main__":
     
     # Se o resumo ainda não existe, lê o arquivo original, gera os registros e salva o resumo.
     if not os.path.exists(summary_path):
-        original_path = os.path.join('Takeout', 'YouTube e YouTube Music', 'histórico', 'histórico-de-visualização.html')
+        original_path = os.path.join('Takeout_Li', 'YouTube e YouTube Music', 'histórico', 'histórico-de-visualização.html')
         # original_path = "histórico-de-visualização-cortado.html"
         print("Iniciando análise")
         registros = parse_html(original_path)
