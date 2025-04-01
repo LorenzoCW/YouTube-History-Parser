@@ -14,6 +14,9 @@ meses = {
     "set.": "Sep", "out.": "Oct", "nov.": "Nov", "dez.": "Dec"
 }
 
+def linha():
+    print("\n-------------------------------------")
+
 def converter_data(data_str):
     """
     Converte uma string de data do formato: 
@@ -209,8 +212,46 @@ def dias_mais_assistidos_por_ano(registros, quantidade):
         resultado[ano] = cont.most_common(quantidade)
     return resultado
 
-def linha():
-    print("\n-------------------------------------")
+def listar_videos_por_data(registros, data_str): #10
+    """
+    Vídeos de uma data: Lista todos os vídeos (e o canal a que pertencem) de uma data especificada.
+    No início, exibe a quantidade de vídeos encontrados.
+    
+    Parâmetros:
+      registros: lista de dicionários com os dados dos vídeos.
+      data_str: string no formato 'YYYY-MM-DD' representando a data alvo.
+    
+    Retorna:
+      Uma lista de registros que correspondem à data especificada.
+    """
+    # Converte a string para objeto datetime.date
+    target_date = datetime.strptime(data_str, "%Y-%m-%d").date()
+    videos = [r for r in registros if r["view_date"] and r["view_date"].date() == target_date]
+    videos = sorted(videos, key=lambda x: x["view_date"], reverse=False) # Fica mais organizado o sorted separado assim
+    return videos
+
+def listar_canais_por_data(registros, data_str): # 11
+    """
+    Canais de uma data: Lista todos os canais acessados em um dia especificado.
+    No início, exibe a quantidade de canais únicos encontrados.
+    
+    Parâmetros:
+      registros: lista de dicionários com os dados dos vídeos.
+      data_str: string no formato 'YYYY-MM-DD' representando a data alvo.
+    
+    Retorna:
+      Uma lista de dicionários com 'channel_name' e 'channel_link' de canais únicos.
+    """
+    target_date = datetime.strptime(data_str, "%Y-%m-%d").date()
+    canais = {}
+    for r in registros:
+        if r["view_date"] and r["view_date"].date() == target_date:
+            # Utiliza o nome do canal para identificar de forma única
+            if r["channel_name"] not in canais:
+                canais[r["channel_name"]] = r["channel_link"]
+    canais_lista = [{"channel_name": nome, "channel_link": link} for nome, link in canais.items()]
+    canais_lista = sorted(canais_lista, key=lambda x: x["channel_name"], reverse=True)
+    return canais_lista
 
 def menu(registros):
     """
@@ -221,13 +262,19 @@ def menu(registros):
         print("1. Primeiros vídeos de um canal")
         print("2. Primeiros vídeos assistidos")
         print("3. Primeiros vídeos assistidos de cada ano")
+        print("")
         print("4. Vídeos que mais assistiu")
         print("5. Vídeos que mais assistiu por ano")
         print("6. Canais mais assistidos")
         print("7. Canais mais assistidos por ano")
         print("8. Dias com mais vídeos assistidos")
         print("9. Dias com mais vídeos assistidos por ano")
+        print("")
+        print("10. Vídeos de uma data")
+        print("11. Canais de uma data")
+        print("")
         print("0. Sair")
+        print("")
         opcao = input("Escolha uma opção: ").strip()
         
         if opcao == "0":
@@ -312,6 +359,24 @@ def menu(registros):
                 print(f"\nAno {ano}:")
                 for data, count in resultados[ano]:
                     print(f"  {data} - {count} vídeos")
+            linha()
+        
+        elif opcao == "10":
+            data_input = input("Digite a data (YYYY-MM-DD): ").strip()
+            resultados = listar_videos_por_data(registros, data_input)
+            linha()
+            print(f"Quantidade de vídeos assistidos em {data_input}: {len(resultados)}")
+            for r in resultados:
+                print(f"{r['view_date_str']} - {r['video_title']} ({r['channel_name']})")
+            linha()
+        
+        elif opcao == "11":
+            data_input = input("Digite a data (YYYY-MM-DD): ").strip()
+            resultados = listar_canais_por_data(registros, data_input)
+            linha()
+            print(f"Quantidade de canais assistidos em {data_input}: {len(resultados)}")
+            for canal in resultados:
+                print(f"{canal['channel_name']} - {canal['channel_link']}")
             linha()
 
         else:
