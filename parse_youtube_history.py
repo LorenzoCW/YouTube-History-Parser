@@ -250,8 +250,55 @@ def listar_canais_por_data(registros, data_str): # 11
             if r["channel_name"] not in canais:
                 canais[r["channel_name"]] = r["channel_link"]
     canais_lista = [{"channel_name": nome, "channel_link": link} for nome, link in canais.items()]
-    canais_lista = sorted(canais_lista, key=lambda x: x["channel_name"], reverse=True)
+    canais_lista = sorted(canais_lista, key=lambda x: x["channel_name"], reverse=False)
     return canais_lista
+
+def buscar_por_titulo(registros, query):
+    """
+    Busca vídeos cujo título contenha os termos especificados e retorna os resultados
+    em ordem crescente de data de visualização.
+    
+    A query pode conter grupos de termos separados por vírgula.
+    Em cada grupo, os termos separados por espaço serão combinados com condição AND,
+    ou seja, o vídeo deve conter todos os termos do grupo (case insensitive).
+    Se houver mais de um grupo, a condição entre os grupos é OR,
+    ou seja, o vídeo será considerado se satisfizer pelo menos um grupo.
+    
+    Exemplos:
+      - "Play" retorna vídeos que contenham "play" (independente de caixa).
+      - "Play, mod" retorna vídeos que contenham "play" OU "mod".
+      - "Play mod" retorna vídeos que contenham "play" E "mod".
+      - "Play mod, tutorial box" retorna vídeos que contenham ("play" E "mod") OU ("tutorial" E "box").
+    
+    Parâmetros:
+      registros: lista de dicionários com os dados dos vídeos.
+      query: string contendo os termos a serem buscados.
+      
+    Retorna:
+      Lista de registros que correspondem à busca, ordenados por data de visualização (ascendente).
+    """
+    query = query.strip()
+    if not query:
+        return []
+    
+    # Divide a query em grupos (usando a vírgula como separador)
+    groups = [group.strip() for group in query.split(",") if group.strip()]
+    # Para cada grupo, separamos os termos por espaços e os transformamos em minúsculas
+    groups_terms = [
+        [term.strip().lower() for term in group.split() if term.strip()]
+        for group in groups
+    ]
+    
+    resultados = [
+        r for r in registros
+        if any(all(term in r["video_title"].lower() for term in group) for group in groups_terms)
+    ]
+    
+    # Ordena os resultados em ordem crescente de data
+    resultados_ordenados = sorted(resultados, key=lambda x: x["view_date"] if x["view_date"] else datetime.max)
+    return resultados_ordenados
+
+
 
 def menu(registros):
     """
@@ -272,6 +319,8 @@ def menu(registros):
         print("")
         print("10. Vídeos de uma data")
         print("11. Canais de uma data")
+        print("")
+        print("12. Vídeos por título")
         print("")
         print("0. Sair")
         print("")
@@ -377,6 +426,16 @@ def menu(registros):
             print(f"Quantidade de canais assistidos em {data_input}: {len(resultados)}")
             for canal in resultados:
                 print(f"{canal['channel_name']} - {canal['channel_link']}")
+            linha()
+
+        elif opcao == "12":
+            termo_busca = input("Digite o(s) termo(s) para buscar no título. "
+                                "Separe grupos por vírgula e, dentro de cada grupo, separe os termos por espaço: ").strip()
+            resultados = buscar_por_titulo(registros, termo_busca)
+            linha()
+            print(f"Total de vídeos encontrados: {len(resultados)}")
+            for r in resultados:
+                print(f"{r['view_date_str']} - {r['video_title']} ({r['channel_name']})")
             linha()
 
         else:
