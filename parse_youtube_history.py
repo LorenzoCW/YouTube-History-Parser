@@ -103,63 +103,6 @@ def parse_html(file_path):
     
     return registros
 
-def save_summary(registros, out_path):
-    """
-    Salva um arquivo HTML com o resumo dos dados (apenas texto).
-    Cada registro é salvo em uma linha simples.
-    """
-    with open(out_path, "w", encoding="utf-8") as f:
-        f.write("<html><head><meta charset='UTF-8'><title>Histórico Resumido</title></head><body>\n")
-        for reg in registros:            
-            linha = (f"Título: {reg['video_title']}<br>\n"
-                     f"Link: {reg['video_link']}<br>\n"
-                     f"Canal: {reg['channel_name']}<br>\n"
-                     f"Canal Link: {reg['channel_link']}<br>\n"
-                     f"Data: {reg['view_date_str']}<br>\n"
-                     f"<hr>\n")
-
-            f.write(linha)
-        f.write("</body></html>")
-
-def load_summary(summary_path):
-    """
-    Lê o arquivo de resumo e reconstrói os registros.
-    Como o HTML salvo possui blocos separados por <hr>, usamos isso para separar cada registro.
-    """
-    registros = []
-    with open(summary_path, encoding="utf-8") as f:
-        soup = BeautifulSoup(f, "html.parser")
-    
-    # Divide o conteúdo do body usando a tag <hr> como separador
-    conteudo = soup.body.decode_contents()
-    # blocos = conteudo.split("<hr>")
-    blocos = [b for b in conteudo.split("<hr>") if b.strip()]
-    # for bloco in blocos:
-    for bloco in tqdm(blocos, desc="Carregando registros", unit="registro"):
-        bloco = bloco.strip()
-        if not bloco:
-            continue
-        # Usamos o BeautifulSoup para remover as tags <br>
-        bloco_soup = BeautifulSoup(bloco, "html.parser")
-        texto = bloco_soup.get_text(separator="\n").strip()
-        linhas = [linha.strip() for linha in texto.split("\n") if linha.strip()]
-        reg = {}
-        for linha in linhas:
-            if linha.startswith("Título: "):
-                reg["video_title"] = linha.replace("Título: ", "").strip()
-            elif linha.startswith("Link: "):
-                reg["video_link"] = linha.replace("Link: ", "").strip()
-            elif linha.startswith("Canal: "):
-                reg["channel_name"] = linha.replace("Canal: ", "").strip()
-            elif linha.startswith("Canal Link: "):
-                reg["channel_link"] = linha.replace("Canal Link: ", "").strip()
-            elif linha.startswith("Data: "):
-                view_date_str = linha.replace("Data: ", "").strip()
-                reg["view_date_str"] = view_date_str
-                reg["view_date"] = converter_data(view_date_str)
-        registros.append(reg)
-    return registros
-
 def listar_por_canal(registros, canal_busca, quantidade):
     """
     Filtra os registros cujo nome do canal contenha canal_busca (case insensitive),
@@ -275,15 +218,15 @@ def menu(registros):
     """
     while True:
         print("\nMenu de opções:")
-        print("1. Pesquisar o nome de um canal e listar os primeiros vídeos do canal")
-        print("2. Listar os primeiros vídeos assistidos na conta")
-        print("3. Listar os primeiros vídeos de cada ano")
-        print("4. Listar os vídeos que mais assistiu (nome e quantidade)")
-        print("5. Listar os vídeos que mais assistiu em cada ano (ano, nome e quantidade)")
-        print("6. Listar os canais que tiveram mais vídeos assistidos (nome e quantidade)")
-        print("7. Listar os canais que tiveram vídeos assistidos em cada ano (ano, nome e quantidade)")
-        print("8. Listar os dias que mais tiveram vídeos assistidos (data e quantidade)")
-        print("9. Listar os dias que mais tiveram vídeos assistidos por ano (ano, data e quantidade)")
+        print("1. Primeiros vídeos de um canal")
+        print("2. Primeiros vídeos assistidos")
+        print("3. Primeiros vídeos assistidos de cada ano")
+        print("4. Vídeos que mais assistiu")
+        print("5. Vídeos que mais assistiu por ano")
+        print("6. Canais mais assistidos")
+        print("7. Canais mais assistidos por ano")
+        print("8. Dias com mais vídeos assistidos")
+        print("9. Dias com mais vídeos assistidos por ano")
         print("0. Sair")
         opcao = input("Escolha uma opção: ").strip()
         
@@ -375,27 +318,14 @@ def menu(registros):
             print("Opção inválida. Tente novamente.")
 
 if __name__ == "__main__":
-    # Caminho para o arquivo de resumo na raiz do projeto
-    summary_path = "histórico-de-visualização-resumido.html"
+
+    process_file = "Takeout_Lo"
+    original_path = os.path.join(process_file, 'YouTube e YouTube Music', 'histórico', 'histórico-de-visualização.html')
     
-    # Se o resumo ainda não existe, lê o arquivo original, gera os registros e salva o resumo.
-    if not os.path.exists(summary_path):
-        original_path = os.path.join('Takeout_Li', 'YouTube e YouTube Music', 'histórico', 'histórico-de-visualização.html')
-        # original_path = "histórico-de-visualização-cortado.html"
-        print("Iniciando análise")
-        registros = parse_html(original_path)
-        if registros:
-            print(f"\nForam encontrados {len(registros)} registros no arquivo original.")
-            save_summary(registros, summary_path)
-            print(f"Resumo salvo em '{summary_path}'.")
-        else:
-            print("Nenhum registro foi encontrado no arquivo original.")
-            registros = []
+    print("Iniciando análise...")
+    registros = parse_html(original_path)
+    if registros:
+        print(f"\nForam encontrados {len(registros)} registros no arquivo original.")
+        menu(registros)
     else:
-        # Se o resumo já existe, carrega os registros a partir dele.
-        print("Iniciando análise com os dados resumidos")
-        registros = load_summary(summary_path)
-        print(f"\nForam carregados {len(registros)} registros a partir do resumo.")
-    
-    # Envia os registros para o menu interativo.
-    menu(registros)
+        print("Nenhum registro encontrado.")
