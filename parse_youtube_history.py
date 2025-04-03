@@ -14,8 +14,32 @@ meses = {
     "set.": "Sep", "out.": "Oct", "nov.": "Nov", "dez.": "Dec"
 }
 
+def salvar_resultados_registros(registros): # Debug
+    # Salva os primeiros X registros em um arquivo TXT para analisar
+    if registros:
+        num_registros_para_salvar = 1000
+        registros_para_salvar = registros[:num_registros_para_salvar]
+        
+        with open("registros_salvos.txt", mode="w", encoding="utf-8") as file:
+            for i, registro in enumerate(registros_para_salvar, start=1):
+                file.write(f"Registro {i}:\n")
+                for key, value in registro.items():
+                    file.write(f"{key}: {value}\n")
+                file.write("\n")
+        
+        print(f"Salvou os primeiros {len(registros_para_salvar)} registros em 'registros_salvos.txt'.")
+
 def linha():
-    print("\n-------------------------------------")
+    print("-" * 100)
+
+def sort(registros):
+    registros_ordenados = sorted(registros, key=lambda x: x["view_date"])
+    return registros_ordenados
+
+def registro_sem_ad(r):
+    if r["view_date"] and "YouTube" in r.get("produto", "") and "From Google Ads" not in r.get("detalhes", ""):
+        return True
+    return False
 
 def converter_data(data_str):
     """
@@ -39,7 +63,7 @@ def converter_data(data_str):
     return None
 
 def parse_single_record(cell_html):
-    """ Processa um único registro para extração de dados. """
+    """ Processa um registro para extração de dados. """
     
     outer = BeautifulSoup(cell_html, "lxml")
     
@@ -47,6 +71,7 @@ def parse_single_record(cell_html):
     if not content_cells:
         return None
     
+    # Seleciona a célula de corpo (body) que contém os dados principais
     body_cell = next((cell for cell in content_cells if "mdl-typography--body-1" in cell.get("class", [])), None)
     if not body_cell:
         return None
@@ -58,6 +83,7 @@ def parse_single_record(cell_html):
     video_title = video_link_tag.text.strip()
     video_link = video_link_tag.get("href")
     
+    # Tenta capturar o canal associado (caso exista)
     channel_link_tag = video_link_tag.find_next("a", href=re.compile("https://www.youtube.com/channel"))
     channel_name = channel_link_tag.text.strip() if channel_link_tag else ""
     channel_link = channel_link_tag.get("href") if channel_link_tag else ""
@@ -67,20 +93,51 @@ def parse_single_record(cell_html):
     view_date_str = data_match.group(0) if data_match else ""
     view_date = converter_data(view_date_str) if view_date_str else None
 
+    # Processa o elemento de legenda para extrair "produto" e "detalhes"
+    caption_cell = outer.find("div", class_="mdl-typography--caption")
+    produto = ""
+    detalhes = ""
+    if caption_cell:
+        # Cria uma lista dos filhos diretos ignorando nós vazios
+        children = [child for child in caption_cell.children if not (isinstance(child, str) and child.strip() == "")]
+        # Converte todos para uma lista simples para facilitar a iteração
+        children = list(children)
+        for i, child in enumerate(children):
+            if getattr(child, "name", None) == "b":
+                label = child.get_text(strip=True)
+                if label.startswith("Produtos"):
+                    # Verifica se o próximo item é uma tag <br> e pega o que vem depois
+                    if i + 1 < len(children):
+                        next_item = children[i+1]
+                        if getattr(next_item, "name", None) == "br" and i + 2 < len(children):
+                            produto = str(children[i+2]).strip()
+                        else:
+                            produto = str(next_item).strip()
+                elif label.startswith("Detalhes"):
+                    if i + 1 < len(children):
+                        next_item = children[i+1]
+                        if getattr(next_item, "name", None) == "br" and i + 2 < len(children):
+                            detalhes = str(children[i+2]).strip()
+                        else:
+                            detalhes = str(next_item).strip()
+    
     return {
         "video_title": video_title,
         "video_link": video_link,
         "channel_name": channel_name,
         "channel_link": channel_link,
         "view_date": view_date,
-        "view_date_str": view_date_str
+        "view_date_str": view_date_str,
+        "produto": produto,
+        "detalhes": detalhes
     }
 
 def parse_html(file_path):
     """
     Lê o arquivo HTML do histórico e extrai os dados de cada visualização.
     Retorna uma lista de dicionários com as chaves:
-      'video_title', 'video_link', 'channel_name', 'channel_link', 'view_date' (datetime) e 'view_date_str'
+      'video_title', 'video_link', 'channel_name', 'channel_link', 'view_date' (datetime),
+      'view_date_str', 'produto' e 'detalhes'
     """
 
     start_time = time.time()
@@ -95,8 +152,10 @@ def parse_html(file_path):
     with Pool() as pool:
         registros = list(tqdm(pool.imap(parse_single_record, outer_cells), total=len(outer_cells), desc="Processando registros", unit="registro"))
 
-    # Remove registros None (caso algum registro não tenha sido encontrado)
+    # Remove registros None
     registros = [registro for registro in registros if registro is not None]
+
+    # salvar_resultados_registros(registros)
 
     end_time = time.time()
     elapsed_time = end_time - start_time
@@ -106,53 +165,63 @@ def parse_html(file_path):
     
     return registros
 
-def listar_por_canal(registros, canal_busca, quantidade):
+def listar_por_canal(registros, canal_busca, quantidade): # 1
     """
     Filtra os registros cujo nome do canal contenha canal_busca (case insensitive),
     ordena os vídeos por data de visualização (mais antigos primeiro),
     e retorna os primeiros 'quantidade' vídeos.
     """
     filtrados = [r for r in registros if canal_busca.lower() in r["channel_name"].lower()]
-    filtrados_ord = sorted(filtrados, key=lambda x: x["view_date"])
-    return filtrados_ord[:quantidade]
+    filtrados = sort(filtrados)[:quantidade]
+    return filtrados
 
-def listar_primeiros_videos(registros, quantidade):
+def listar_primeiros_videos(registros, quantidade): # 2
     """
-    Retorna os primeiros 'quantidade' vídeos assistidos (ordem cronológica)
+    Retorna os primeiros uma quantidade de vídeos assistidos (ordem cronológica),
+    considerando apenas os registros que são do YouTube.
     """
-    registros_ord = sorted([r for r in registros if r["view_date"]], key=lambda x: x["view_date"])
-    return registros_ord[:quantidade]
+    # Filtra registros que tenham data e cujo campo "produto" seja exatamente "YouTube"
+    registros_filtrados = [
+        r for r in registros 
+        if registro_sem_ad(r)
+    ]
+    registros_filtrados = sort(registros_filtrados)[:quantidade]
+    return registros_filtrados
 
-def listar_primeiros_videos_por_ano(registros, quantidade):
+def listar_primeiros_videos_por_ano(registros, quantidade): # 3
     """
     Para cada ano, retorna os primeiros 'quantidade' vídeos assistidos.
     Retorna um dicionário {ano: [lista de registros]}.
     """
     dados_por_ano = defaultdict(list)
     for r in registros:
-        if r["view_date"]:
+        if registro_sem_ad(r):
             ano = r["view_date"].year
             dados_por_ano[ano].append(r)
     for ano in dados_por_ano:
-        dados_por_ano[ano] = sorted(dados_por_ano[ano], key=lambda x: x["view_date"])[:quantidade]
+        dados_por_ano[ano] = sort(dados_por_ano[ano])[:quantidade]
     return dados_por_ano
 
-def videos_mais_assistidos(registros, quantidade):
+def videos_mais_assistidos(registros, quantidade): # 4
     """
     Conta quantas vezes cada vídeo foi assistido (com base no título)
     e retorna uma lista dos vídeos mais assistidos com contagem.
     """
-    contagem = Counter(r["video_title"] for r in registros)
+    registros_filtrados = [
+        r for r in registros 
+        if registro_sem_ad(r)
+    ]
+    contagem = Counter(r["video_title"] for r in registros_filtrados)
     return contagem.most_common(quantidade)
 
-def videos_mais_assistidos_por_ano(registros, quantidade):
+def videos_mais_assistidos_por_ano(registros, quantidade): # 5
     """
     Para cada ano, conta os vídeos mais assistidos.
     Retorna um dicionário {ano: [(video_title, count), ...]}.
     """
     dados_por_ano = defaultdict(list)
     for r in registros:
-        if r["view_date"]:
+        if registro_sem_ad(r):
             ano = r["view_date"].year
             dados_por_ano[ano].append(r["video_title"])
     resultado = {}
@@ -161,21 +230,25 @@ def videos_mais_assistidos_por_ano(registros, quantidade):
         resultado[ano] = cont.most_common(quantidade)
     return resultado
 
-def canais_mais_assistidos(registros, quantidade):
+def canais_mais_assistidos(registros, quantidade): # 6
     """
     Conta quantas vezes cada canal aparece e retorna os canais mais assistidos.
     """
-    contagem = Counter(r["channel_name"] for r in registros)
+    registros_filtrados = [
+        r for r in registros 
+        if registro_sem_ad(r)
+    ]
+    contagem = Counter(r["channel_name"] for r in registros_filtrados)
     return contagem.most_common(quantidade)
 
-def canais_por_ano(registros, quantidade):
+def canais_por_ano(registros, quantidade): # 7
     """
     Para cada ano, conta quantos vídeos foram assistidos por cada canal.
     Retorna um dicionário {ano: [(channel_name, count), ...]}.
     """
     dados_por_ano = defaultdict(list)
     for r in registros:
-        if r["view_date"]:
+        if registro_sem_ad(r):
             ano = r["view_date"].year
             dados_por_ano[ano].append(r["channel_name"])
     resultado = {}
@@ -184,25 +257,25 @@ def canais_por_ano(registros, quantidade):
         resultado[ano] = cont.most_common(quantidade)
     return resultado
 
-def dias_mais_assistidos(registros, quantidade):
+def dias_mais_assistidos(registros, quantidade): # 8
     """
     Conta quantos vídeos foram assistidos em cada dia (data completa) e retorna os dias com mais vídeos.
     """
     contagem = Counter()
     for r in registros:
-        if r["view_date"]:
+        if registro_sem_ad(r):
             dia = r["view_date"].strftime("%Y-%m-%d")
             contagem[dia] += 1
     return contagem.most_common(quantidade)
 
-def dias_mais_assistidos_por_ano(registros, quantidade):
+def dias_mais_assistidos_por_ano(registros, quantidade): # 9
     """
     Para cada ano, conta os dias (data completa) com mais vídeos assistidos.
     Retorna um dicionário {ano: [(data, count), ...]}.
     """
     dados_por_ano = defaultdict(list)
     for r in registros:
-        if r["view_date"]:
+        if registro_sem_ad(r):
             ano = r["view_date"].year
             dia = r["view_date"].strftime("%Y-%m-%d")
             dados_por_ano[ano].append(dia)
@@ -216,44 +289,32 @@ def listar_videos_por_data(registros, data_str): #10
     """
     Vídeos de uma data: Lista todos os vídeos (e o canal a que pertencem) de uma data especificada.
     No início, exibe a quantidade de vídeos encontrados.
-    
-    Parâmetros:
-      registros: lista de dicionários com os dados dos vídeos.
-      data_str: string no formato 'YYYY-MM-DD' representando a data alvo.
-    
-    Retorna:
-      Uma lista de registros que correspondem à data especificada.
     """
     # Converte a string para objeto datetime.date
     target_date = datetime.strptime(data_str, "%Y-%m-%d").date()
-    videos = [r for r in registros if r["view_date"] and r["view_date"].date() == target_date]
-    videos = sorted(videos, key=lambda x: x["view_date"], reverse=False) # Fica mais organizado o sorted separado assim
+    videos = [
+        r for r in registros
+        if registro_sem_ad(r) and r["view_date"].date() == target_date]
+    videos = sort(videos)
     return videos
 
 def listar_canais_por_data(registros, data_str): # 11
     """
     Canais de uma data: Lista todos os canais acessados em um dia especificado.
     No início, exibe a quantidade de canais únicos encontrados.
-    
-    Parâmetros:
-      registros: lista de dicionários com os dados dos vídeos.
-      data_str: string no formato 'YYYY-MM-DD' representando a data alvo.
-    
-    Retorna:
-      Uma lista de dicionários com 'channel_name' e 'channel_link' de canais únicos.
     """
     target_date = datetime.strptime(data_str, "%Y-%m-%d").date()
     canais = {}
     for r in registros:
-        if r["view_date"] and r["view_date"].date() == target_date:
+        if registro_sem_ad(r) and r["view_date"].date() == target_date:
             # Utiliza o nome do canal para identificar de forma única
             if r["channel_name"] not in canais:
                 canais[r["channel_name"]] = r["channel_link"]
     canais_lista = [{"channel_name": nome, "channel_link": link} for nome, link in canais.items()]
-    canais_lista = sorted(canais_lista, key=lambda x: x["channel_name"], reverse=False)
+    canais_lista = sorted(canais_lista, key=lambda x: x["channel_name"])
     return canais_lista
 
-def buscar_por_titulo(registros, query):
+def buscar_por_titulo(registros, query): # 12
     """
     Busca vídeos cujo título contenha os termos especificados e retorna os resultados
     em ordem crescente de data de visualização.
@@ -263,19 +324,6 @@ def buscar_por_titulo(registros, query):
     ou seja, o vídeo deve conter todos os termos do grupo (case insensitive).
     Se houver mais de um grupo, a condição entre os grupos é OR,
     ou seja, o vídeo será considerado se satisfizer pelo menos um grupo.
-    
-    Exemplos:
-      - "Play" retorna vídeos que contenham "play" (independente de caixa).
-      - "Play, mod" retorna vídeos que contenham "play" OU "mod".
-      - "Play mod" retorna vídeos que contenham "play" E "mod".
-      - "Play mod, tutorial box" retorna vídeos que contenham ("play" E "mod") OU ("tutorial" E "box").
-    
-    Parâmetros:
-      registros: lista de dicionários com os dados dos vídeos.
-      query: string contendo os termos a serem buscados.
-      
-    Retorna:
-      Lista de registros que correspondem à busca, ordenados por data de visualização (ascendente).
     """
     query = query.strip()
     if not query:
@@ -288,24 +336,16 @@ def buscar_por_titulo(registros, query):
         [term.strip().lower() for term in group.split() if term.strip()]
         for group in groups
     ]
-    
     resultados = [
         r for r in registros
-        if any(all(term in r["video_title"].lower() for term in group) for group in groups_terms)
+        if registro_sem_ad(r) and any(all(term in r["video_title"].lower() for term in group) for group in groups_terms)
     ]
-    
-    # Ordena os resultados em ordem crescente de data
-    resultados_ordenados = sorted(resultados, key=lambda x: x["view_date"] if x["view_date"] else datetime.max)
-    return resultados_ordenados
-
-
+    resultados = sort(resultados) # if x["view_date"] else datetime.max)
+    return resultados
 
 def menu(registros):
-    """
-    Menu interativo para o usuário escolher as operações.
-    """
     while True:
-        print("\nMenu de opções:")
+        print("\nOpções:")
         print("1. Primeiros vídeos de um canal")
         print("2. Primeiros vídeos assistidos")
         print("3. Primeiros vídeos assistidos de cada ano")
