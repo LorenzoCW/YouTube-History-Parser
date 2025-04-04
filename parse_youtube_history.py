@@ -6,6 +6,7 @@ from datetime import datetime
 from collections import Counter, defaultdict
 from tqdm import tqdm
 from multiprocessing import Pool
+import plotly.express as px
 
 # Mapeamento dos meses em português para abreviações em inglês
 meses = {
@@ -366,6 +367,119 @@ def buscar_por_titulo(registros, query): # 12
     resultados = sort(resultados) # if x["view_date"] else datetime.max)
     return resultados
 
+# Vídeos por dia: exibe quantidade total e gráfico com contagem por título
+def plot_videos_day(registros, date_str):
+    videos = listar_videos_por_data(registros, date_str)
+    total = len(videos)
+    print(f"Quantidade de vídeos assistidos em {date_str}: {total}")
+    # Contagem por título (caso o vídeo tenha sido assistido mais de uma vez)
+    contagem = Counter(r["video_title"] for r in videos)
+    dados = [{"Vídeo": titulo, "Contagem": count} for titulo, count in contagem.items()]
+    fig = px.bar(dados, x="Vídeo", y="Contagem", title=f"Vídeos assistidos em {date_str}")
+    fig.show()
+
+# Vídeos por mês: exibe quantidade total e gráfico com contagem por dia
+def plot_videos_month(registros, month_str):
+    # month_str no formato "YYYY-MM"
+    registros_mes = [r for r in registros if r["view_date"].strftime("%Y-%m") == month_str and registro_sem_ad(r)]
+    total = len(registros_mes)
+    print(f"Quantidade de vídeos assistidos em {month_str}: {total}")
+    contagem = Counter(r["view_date"].strftime("%Y-%m-%d") for r in registros_mes)
+    dados = [{"Dia": dia, "Contagem": count} for dia, count in contagem.items()]
+    fig = px.bar(dados, x="Dia", y="Contagem", title=f"Vídeos assistidos por dia em {month_str}")
+    fig.show()
+
+# Vídeos por ano: exibe quantidade total e gráfico com contagem por mês
+def plot_videos_year(registros, year_str):
+    registros_ano = [r for r in registros if r["view_date"].year == int(year_str) and registro_sem_ad(r)]
+    total = len(registros_ano)
+    print(f"Quantidade de vídeos assistidos em {year_str}: {total}")
+    contagem = Counter(r["view_date"].strftime("%Y-%m") for r in registros_ano)
+    dados = [{"Mês": mes, "Contagem": count} for mes, count in contagem.items()]
+    fig = px.bar(dados, x="Mês", y="Contagem", title=f"Vídeos assistidos por mês em {year_str}")
+    fig.show()
+
+# Vídeos totais: exibe quantidade total e gráficos por mês (ano-mês) e por ano
+def plot_videos_total(registros):
+    registros_filtrados = [r for r in registros if registro_sem_ad(r)]
+    total = len(registros_filtrados)
+    print(f"Quantidade total de vídeos assistidos: {total}")
+    # Gráfico por ano-mês
+    contagem_mes = Counter(r["view_date"].strftime("%Y-%m") for r in registros_filtrados)
+    dados_mes = [{"Ano-Mês": mes, "Contagem": count} for mes, count in contagem_mes.items()]
+    fig1 = px.bar(dados_mes, x="Ano-Mês", y="Contagem", title="Vídeos assistidos por Ano-Mês")
+    fig1.show()
+    # Gráfico por ano
+    contagem_ano = Counter(r["view_date"].year for r in registros_filtrados)
+    dados_ano = [{"Ano": ano, "Contagem": count} for ano, count in contagem_ano.items()]
+    fig2 = px.bar(dados_ano, x="Ano", y="Contagem", title="Vídeos assistidos por Ano")
+    fig2.show()
+
+# Canais por dia: exibe quantidade total de canais únicos e gráfico com contagem por canal (frequência de acesso)
+def plot_channels_day(registros, date_str):
+    videos = listar_videos_por_data(registros, date_str)
+    canais_dict = {}
+    for r in videos:
+        if r["channel_name"] in canais_dict:
+            canais_dict[r["channel_name"]] += 1
+        else:
+            canais_dict[r["channel_name"]] = 1
+    total = len(canais_dict)
+    print(f"Quantidade de canais assistidos em {date_str}: {total}")
+    dados = [{"Canal": canal, "Frequência": freq} for canal, freq in canais_dict.items()]
+    fig = px.bar(dados, x="Canal", y="Frequência", title=f"Canais acessados em {date_str}")
+    fig.show()
+
+# Canais por mês: exibe quantidade total (únicos por dia) e gráfico com contagem por dia
+def plot_channels_month(registros, month_str):
+    registros_mes = [r for r in registros if r["view_date"].strftime("%Y-%m") == month_str and registro_sem_ad(r)]
+    # Agrupa por dia com canais únicos
+    canais_por_dia = defaultdict(set)
+    for r in registros_mes:
+        dia = r["view_date"].strftime("%Y-%m-%d")
+        canais_por_dia[dia].add(r["channel_name"])
+    dados = [{"Dia": dia, "Canais Únicos": len(canais)} for dia, canais in canais_por_dia.items()]
+    total = sum(len(canais) for canais in canais_por_dia.values())
+    print(f"Quantidade total (soma diária) de canais assistidos em {month_str}: {total}")
+    fig = px.bar(dados, x="Dia", y="Canais Únicos", title=f"Canais únicos por dia em {month_str}")
+    fig.show()
+
+# Canais por ano: exibe quantidade total (únicos por mês) e gráfico com contagem por mês
+def plot_channels_year(registros, year_str):
+    registros_ano = [r for r in registros if r["view_date"].year == int(year_str) and registro_sem_ad(r)]
+    canais_por_mes = defaultdict(set)
+    for r in registros_ano:
+        mes = r["view_date"].strftime("%Y-%m")
+        canais_por_mes[mes].add(r["channel_name"])
+    dados = [{"Mês": mes, "Canais Únicos": len(canais)} for mes, canais in canais_por_mes.items()]
+    total = sum(len(canais) for canais in canais_por_mes.values())
+    print(f"Quantidade total (soma mensal) de canais assistidos em {year_str}: {total}")
+    fig = px.bar(dados, x="Mês", y="Canais Únicos", title=f"Canais únicos por mês em {year_str}")
+    fig.show()
+
+# Canais totais: exibe quantidade total de canais únicos e gráficos por Ano-Mês e Ano
+def plot_channels_total(registros):
+    registros_filtrados = [r for r in registros if registro_sem_ad(r)]
+    # Canais únicos totais
+    canais_total = set(r["channel_name"] for r in registros_filtrados)
+    print(f"Quantidade total de canais únicos: {len(canais_total)}")
+    # Por Ano-Mês
+    canais_por_mes = defaultdict(set)
+    for r in registros_filtrados:
+        mes = r["view_date"].strftime("%Y-%m")
+        canais_por_mes[mes].add(r["channel_name"])
+    dados_mes = [{"Ano-Mês": mes, "Canais Únicos": len(canais)} for mes, canais in canais_por_mes.items()]
+    fig1 = px.bar(dados_mes, x="Ano-Mês", y="Canais Únicos", title="Canais únicos por Ano-Mês")
+    fig1.show()
+    # Por Ano
+    canais_por_ano = defaultdict(set)
+    for r in registros_filtrados:
+        ano = r["view_date"].year
+        canais_por_ano[ano].add(r["channel_name"])
+    dados_ano = [{"Ano": ano, "Canais Únicos": len(canais)} for ano, canais in canais_por_ano.items()]
+    fig2 = px.bar(dados_ano, x="Ano", y="Canais Únicos", title="Canais únicos por Ano")
+    fig2.show()
+
 def menu(registros):
     while True:
         print("\nOpções:")
@@ -384,6 +498,16 @@ def menu(registros):
         print("11. Canais de uma data")
         print("")
         print("12. Vídeos por título")
+        print("")
+        print("13. Quantidade de vídeos de um dia específico (com gráfico por vídeo)")
+        print("14. Quantidade de vídeos de um mês específico (com gráfico por dia)")
+        print("15. Quantidade de vídeos de um ano específico (com gráfico por mês)")
+        print("16. Quantidade de vídeos totais (com gráfico por mês e ano)")
+        print("")
+        print("17. Quantidade de canais de um dia específico (com gráfico por canal)")
+        print("18. Quantidade de canais de um mês específico (com gráfico por dia)")
+        print("19. Quantidade de canais de um ano específico (com gráfico por mês)")
+        print("20. Quantidade de canais totais (com gráfico por mês e ano)")
         print("")
         print("0. Sair")
         print("")
@@ -503,6 +627,36 @@ def menu(registros):
             for r in resultados:
                 print(f"{r['view_date_str']} - {r['video_title']} ({r['channel_name']})")
             linha()
+
+        elif opcao == "13":
+            data_input = input("Digite a data (YYYY-MM-DD): ").strip()
+            plot_videos_day(registros, data_input)
+            
+        elif opcao == "14":
+            month_input = input("Digite o mês (YYYY-MM): ").strip()
+            plot_videos_month(registros, month_input)
+            
+        elif opcao == "15":
+            year_input = input("Digite o ano (YYYY): ").strip()
+            plot_videos_year(registros, year_input)
+            
+        elif opcao == "16":
+            plot_videos_total(registros)
+            
+        elif opcao == "17":
+            data_input = input("Digite a data (YYYY-MM-DD): ").strip()
+            plot_channels_day(registros, data_input)
+            
+        elif opcao == "18":
+            month_input = input("Digite o mês (YYYY-MM): ").strip()
+            plot_channels_month(registros, month_input)
+            
+        elif opcao == "19":
+            year_input = input("Digite o ano (YYYY): ").strip()
+            plot_channels_year(registros, year_input)
+            
+        elif opcao == "20":
+            plot_channels_total(registros)
 
         else:
             print("Opção inválida. Tente novamente.")
