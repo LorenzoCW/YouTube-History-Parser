@@ -62,6 +62,29 @@ def converter_data(data_str):
             print(f"Erro ao converter data '{data_formatada}': {e}")
     return None
 
+def formatar_data(data_str):
+    """
+    Recebe uma data no formato "5 de set. de 2018, 21:45:55" 
+    e retorna com o dia com dois dígitos, por exemplo, "05 de set. de 2018, 21:45:55".
+    """
+    # Separa a data e a hora pela vírgula
+    try:
+        data, hora = data_str.split(',', 1)
+    except ValueError:
+        # Se não houver vírgula, retorna a string original
+        return data_str
+
+    # Separa o dia dos demais componentes (assumindo que o primeiro token é o dia)
+    partes = data.split(" de ", 1)
+    if len(partes) != 2:
+        return data_str  # formato inesperado, retorna original
+
+    dia, resto = partes
+    # Preenche o dia com zero à esquerda se tiver apenas um dígito
+    dia_formatado = dia.zfill(2)
+    # Reconstrói a data
+    return f"{dia_formatado} de {resto},{hora}"
+
 def parse_single_record(cell_html):
     """ Processa um registro para extração de dados. """
     
@@ -375,7 +398,8 @@ def menu(registros):
             resultados = listar_por_canal(registros, canal, qtd)
             linha()
             for r in resultados:
-                print(f"{r['view_date_str']} - {r['video_title']} ({r['channel_name']})")
+                data_formatada = formatar_data(r['view_date_str'])
+                print(f"{data_formatada} - {r['video_title']} ({r['channel_name']})")
             linha()
                 
         elif opcao == "2":
@@ -383,7 +407,8 @@ def menu(registros):
             resultados = listar_primeiros_videos(registros, qtd)
             linha()
             for r in resultados:
-                print(f"{r['view_date_str']} - {r['video_title']} ({r['channel_name']})")
+                data_formatada = formatar_data(r['view_date_str'])
+                print(f"{data_formatada} - {r['video_title']} ({r['channel_name']})")
             linha()
                 
         elif opcao == "3":
@@ -393,7 +418,8 @@ def menu(registros):
             for ano in sorted(resultados.keys()):
                 print(f"\nAno {ano}:")
                 for r in resultados[ano]:
-                    print(f"  {r['view_date_str']} - {r['video_title']} ({r['channel_name']})")
+                    data_formatada = formatar_data(r['view_date_str'])
+                    print(f"  {data_formatada} - {r['video_title']} ({r['channel_name']})")
             linha()
                     
         elif opcao == "4":
@@ -401,7 +427,7 @@ def menu(registros):
             resultados = videos_mais_assistidos(registros, qtd)
             linha()
             for titulo, count in resultados:
-                print(f"{titulo} - {count} vezes")
+                print(f"{count:02d} vezes - {titulo}")
             linha()
                 
         elif opcao == "5":
@@ -411,7 +437,7 @@ def menu(registros):
             for ano in sorted(resultados.keys()):
                 print(f"\nAno {ano}:")
                 for titulo, count in resultados[ano]:
-                    print(f"  {titulo} - {count} vezes")
+                    print(f"  {count:02d} vezes - {titulo}")
             linha()
                     
         elif opcao == "6":
