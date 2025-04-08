@@ -24,7 +24,7 @@ def save_results_records(total_records): # Debug
     """
 
     if total_records:
-        num_records_to_save = 1000
+        num_records_to_save = 30000
         records_to_save = total_records[:num_records_to_save]
         
         with open("saved_records.txt", mode="w", encoding="utf-8") as file:
@@ -465,8 +465,10 @@ def plot_videos_day(): # 13
     
     videos = list_videos_by_date()
     total = len(videos)
+    line()
     print(f"Quantidade de vídeos assistidos em {date_str}: {total}")
-    
+    line()
+
     count = Counter(r["video_title"] for r in videos)
     graph_data = [{"Video title": title, "Count": count} for title, count in count.items()]
     fig = px.bar(graph_data, x="Video title", y="Count", title=f"Vídeos assistidos em {date_str}")
@@ -481,8 +483,10 @@ def plot_videos_month(): # 14
     
     month_records = [r for r in records if r["view_date"].strftime("%Y-%m") == month_str and record_without_ad(r)]
     total = len(month_records)
+    line()
     print(f"Quantidade de vídeos assistidos em {month_str}: {total}")
-    
+    line()
+
     count = Counter(r["view_date"].strftime("%Y-%m-%d") for r in month_records)
     graph_data = [{"Day": day, "Count": count} for day, count in count.items()]
     fig = px.bar(graph_data, x="Day", y="Count", title=f"Vídeos assistidos por dia em {month_str}")
@@ -497,8 +501,10 @@ def plot_videos_year(): # 15
 
     year_records = [r for r in records if r["view_date"].year == int(year_str) and record_without_ad(r)]
     total = len(year_records)
+    line()
     print(f"Quantidade de vídeos assistidos em {year_str}: {total}")
-    
+    line()
+
     count = Counter(r["view_date"].strftime("%Y-%m") for r in year_records)
     graph_data = [{"Month": month, "Count": count} for month, count in count.items()]
     fig = px.bar(graph_data, x="Month", y="Count", title=f"Vídeos assistidos por mês em {year_str}")
@@ -511,8 +517,10 @@ def plot_videos_total(): # 16
     
     filtered_records = [r for r in records if record_without_ad(r)]
     total = len(filtered_records)
+    line()
     print(f"Quantidade total de vídeos assistidos: {total}")
-    
+    line()
+
     month_count = Counter(r["view_date"].strftime("%Y-%m") for r in filtered_records)
     month_data = [{"Year-Month": month, "Count": count} for month, count in month_count.items()]
     fig1 = px.bar(month_data, x="Year-Month", y="Count", title="Vídeos assistidos por Ano-Mês")
@@ -538,8 +546,10 @@ def plot_channels_day(): # 17
         else:
             channels_dict[r["channel_name"]] = 1
     total = len(channels_dict)
+    line()
     print(f"Quantidade de canais assistidos em {date_str}: {total}")
-    
+    line()
+
     graph_data = [{"Channel": channel, "Frequency": freq} for channel, freq in channels_dict.items()]
     fig = px.bar(graph_data, x="Channel", y="Frequency", title=f"Canais acessados em {date_str}")
     fig.show()
@@ -558,8 +568,10 @@ def plot_channels_month(): # 18
         channels_per_day[day].add(r["channel_name"])
     graph_data = [{"Day": day, "Unique Channels": len(channels)} for day, channels in channels_per_day.items()]
     total = sum(len(channels) for channels in channels_per_day.values())
+    line()
     print(f"Quantidade total de canais assistidos em {month_str}: {total}")
-    
+    line()
+
     fig = px.bar(graph_data, x="Day", y="Unique Channels", title=f"Canais únicos por dia em {month_str}")
     fig.show()
 
@@ -577,8 +589,10 @@ def plot_channels_year(): # 19
         channels_per_month[month].add(r["channel_name"])
     graph_data = [{"Month": month, "Unique Channels": len(channels)} for month, channels in channels_per_month.items()]
     total = sum(len(channels) for channels in channels_per_month.values())
+    line()
     print(f"Quantidade total de canais assistidos em {year_str}: {total}")
-    
+    line()
+
     fig = px.bar(graph_data, x="Month", y="Unique Channels", title=f"Canais únicos por mês em {year_str}")
     fig.show()
 
@@ -590,7 +604,9 @@ def plot_channels_total(): # 20
     filtered_records = [r for r in records if record_without_ad(r)]
 
     total_channels = set(r["channel_name"] for r in filtered_records)
+    line()
     print(f"Quantidade total de canais assistidos: {len(total_channels)}")
+    line()
 
     channels_per_month = defaultdict(set)
     for r in filtered_records:
@@ -606,6 +622,69 @@ def plot_channels_total(): # 20
         most_watched_channels_by_year[year].add(r["channel_name"])
     year_data = [{"Year": year, "Unique Channels": len(channels)} for year, channels in most_watched_channels_by_year.items()]
     fig2 = px.bar(year_data, x="Year", y="Unique Channels", title="Canais únicos por Ano")
+    fig2.show()
+
+def most_watched_ads(): # 21
+    """
+    Conta quantas vezes cada propaganda foi assistida (com base no título)
+    e retorna uma lista das propagandas mais assistidas com contagem.
+    """
+    quantity = int(input("Quantidade de registros para listar: "))
+    ads_filtered_records = [r for r in records if not record_without_ad(r)]
+    count = Counter(r["video_title"] for r in ads_filtered_records)
+    results = count.most_common(quantity)
+    
+    line()
+    for title, cnt in results:
+        print(f"{cnt:02d} vezes - {title}")
+    line()
+
+def most_watched_ads_by_year(): # 22
+    """
+    Para cada ano, conta as propagandas mais assistidas.
+    Retorna um dicionário {ano: [(video_title, count), ...]}.
+    """
+    quantity = int(input("Quantidade de registros para listar: "))
+    ads_by_year = defaultdict(list)
+    for r in records:
+        if not record_without_ad(r):
+            year_val = r["view_date"].year
+            ads_by_year[year_val].append(r["video_title"])
+    results = {}
+    for year, ads in ads_by_year.items():
+        cont = Counter(ads)
+        results[year] = cont.most_common(quantity)
+    
+    line()
+    for year in sorted(results.keys()):
+        print(f"\nAno {year}:")
+        for title, cnt in results[year]:
+            print(f"  {cnt:02d} vezes - {title}")
+    line()
+
+def plot_ads_total(): # 23
+    """
+    Propagandas totais: exibe a quantidade total de propagandas (registros que contém 'From Google Ads'),
+    sua porcentagem em relação ao total de registros e gráficos por mês (ano-mês) e por ano.
+    """
+    total_records = len(records)
+    ads_records = [r for r in records if not record_without_ad(r)]
+    total_ads = len(ads_records)
+    percentage = (total_ads / total_records * 100) if total_records else 0
+    line()
+    print(f"Quantidade total de propagandas: {total_ads} ({percentage:.2f}% do total)")
+    line()
+    
+    # Contagem por mês (ano-mês)
+    month_count_ads = Counter(r["view_date"].strftime("%Y-%m") for r in ads_records)
+    month_data_ads = [{"Year-Month": month, "Count": count} for month, count in month_count_ads.items()]
+    fig1 = px.bar(month_data_ads, x="Year-Month", y="Count", title="Propagandas assistidas por Ano-Mês")
+    fig1.show()
+    
+    # Contagem por ano
+    year_count_ads = Counter(r["view_date"].year for r in ads_records)
+    year_data_ads = [{"Year": year, "Count": count} for year, count in year_count_ads.items()]
+    fig2 = px.bar(year_data_ads, x="Year", y="Count", title="Propagandas assistidas por Ano")
     fig2.show()
 
 def menu():
@@ -637,6 +716,10 @@ def menu():
         print("19. Quantidade de canais de um ano específico (com gráfico por mês)")
         print("20. Quantidade de canais totais (com gráfico por mês e ano)")
         print("")
+        print("21. Propagandas que mais assistiu")
+        print("22. Propagandas que mais assistiu por ano")
+        print("23. Quantidade de propagandas totais (com gráfico por mês e ano)")
+        print("")
         print("0. Sair")
         print("")
         option = input("Escolha uma opção: ").strip()
@@ -662,6 +745,9 @@ def menu():
         elif option == "18": plot_channels_month()
         elif option == "19": plot_channels_year()
         elif option == "20": plot_channels_total()
+        elif option == "21": most_watched_ads()
+        elif option == "22": most_watched_ads_by_year()
+        elif option == "23": plot_ads_total()
         else: print("Opção inválida. Tente novamente.")
 
 def main():
