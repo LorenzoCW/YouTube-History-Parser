@@ -687,38 +687,116 @@ def plot_ads_total(): # 23
     fig2 = px.bar(year_data_ads, x="Year", y="Count", title="Propagandas assistidas por Ano")
     fig2.show()
 
+def plot_videos_by_hour(): # 24
+    """
+    Exibe um gráfico de barras com a contagem de vídeos assistidos por hora do dia.
+    """
+    # Extrai a hora de cada visualização (0-23)
+    hour_count = Counter(r["view_date"].hour for r in records if r["view_date"] is not None)
+    # Organiza os dados em ordem crescente de hora
+    hours = list(range(24))
+    counts = [hour_count.get(hour, 0) for hour in hours]
+    data = [{"Hour": hour, "Count": count} for hour, count in zip(hours, counts)]
+    
+    fig = px.bar(data, x="Hour", y="Count", title="Quantidade de vídeos assistidos por hora do dia",
+                 labels={"Hour": "Hora do Dia", "Count": "Quantidade de Vídeos"})
+    fig.show()
+
+def plot_videos_by_weekday(): # 25
+    """
+    Exibe um gráfico de barras com a contagem de vídeos assistidos por dia da semana.
+    """
+    # Mapeamento dos números dos dias (0=segunda, 6=domingo) para nomes
+    weekday_names = {0: "Segunda", 1: "Terça", 2: "Quarta", 3: "Quinta",
+                     4: "Sexta", 5: "Sábado", 6: "Domingo"}
+    weekday_count = Counter(r["view_date"].weekday() for r in records if r["view_date"] is not None)
+    # Ordena pelos dias da semana (0 a 6)
+    data = [{"Weekday": weekday_names.get(day, str(day)), "Count": weekday_count.get(day, 0)} 
+            for day in range(7)]
+    
+    fig = px.bar(data, x="Weekday", y="Count", 
+                 title="Quantidade de vídeos assistidos por dia da semana",
+                 labels={"Weekday": "Dia da Semana", "Count": "Quantidade de Vídeos"})
+    fig.show()
+
+def plot_videos_by_day_of_month(): # 26
+    """
+    Exibe um gráfico de barras com a contagem de vídeos assistidos por dia do mês.
+    """
+    # Dia do mês varia de 1 a 31
+    day_count = Counter(r["view_date"].day for r in records if r["view_date"] is not None)
+    days = list(range(1, 32))
+    data = [{"Day": day, "Count": day_count.get(day, 0)} for day in days]
+    
+    fig = px.bar(data, x="Day", y="Count", 
+                 title="Quantidade de vídeos assistidos por dia do mês",
+                 labels={"Day": "Dia do Mês", "Count": "Quantidade de Vídeos"})
+    fig.show()
+
+def plot_videos_by_month(): # 27
+    """
+    Exibe um gráfico de barras com a contagem de vídeos assistidos por mês.
+    """
+    # Extrai o número do mês (1 a 12) e mapeia para o nome abreviado
+    month_names = {1: "Jan", 2: "Fev", 3: "Mar", 4: "Abr", 5: "Mai", 6: "Jun",
+                   7: "Jul", 8: "Ago", 9: "Set", 10: "Out", 11: "Nov", 12: "Dez"}
+    month_count = Counter(r["view_date"].month for r in records if r["view_date"] is not None)
+    # Garante a ordem de 1 a 12
+    data = [{"Month": month_names.get(month, str(month)), "Count": month_count.get(month, 0)}
+            for month in range(1, 13)]
+    
+    fig = px.bar(data, x="Month", y="Count", 
+                 title="Quantidade de vídeos assistidos por mês",
+                 labels={"Month": "Mês", "Count": "Quantidade de Vídeos"})
+    fig.show()
+
+
 def menu():
     while True:
-        print("\nOpções:")
+        print("\n- Opções -")
+        print("\nPrimeiros vídeos")
         print("1. Primeiros vídeos assistidos")
-        print("2. Primeiros vídeos assistidos de cada ano")
+        print("2. Primeiros vídeos assistidos por ano")
         print("3. Primeiros vídeos de um canal")
-        print("")
+        
+        print("\nMais assistidos")
         print("4. Vídeos que mais assistiu")
         print("5. Vídeos que mais assistiu por ano")
         print("6. Canais mais assistidos")
         print("7. Canais mais assistidos por ano")
         print("8. Dias com mais vídeos assistidos")
         print("9. Dias com mais vídeos assistidos por ano")
-        print("")
+        
+        print("\nPor data")
         print("10. Vídeos de uma data")
         print("11. Canais de uma data")
-        print("")
+        
+        print("\nPor título")
         print("12. Vídeos por título")
-        print("")
+        
+        print("\nQuantidade de vídeos")
         print("13. Quantidade de vídeos de um dia específico (com gráfico por vídeo)")
         print("14. Quantidade de vídeos de um mês específico (com gráfico por dia)")
         print("15. Quantidade de vídeos de um ano específico (com gráfico por mês)")
         print("16. Quantidade de vídeos totais (com gráfico por mês e ano)")
-        print("")
+        
+        print("\nQuantiddade de canais")
         print("17. Quantidade de canais de um dia específico (com gráfico por canal)")
         print("18. Quantidade de canais de um mês específico (com gráfico por dia)")
         print("19. Quantidade de canais de um ano específico (com gráfico por mês)")
         print("20. Quantidade de canais totais (com gráfico por mês e ano)")
-        print("")
+        
+        print("\nPropagandas")
         print("21. Propagandas que mais assistiu")
         print("22. Propagandas que mais assistiu por ano")
         print("23. Quantidade de propagandas totais (com gráfico por mês e ano)")
+        
+        print("\nTendências")
+        print("24. Horários que mais assiste vídeo")
+        print("25. Dias da semana que mais assiste vídeo")
+        print("26. Dias do mês que mais assiste vídeo")
+        print("27. Meses que mais assiste vídeo")
+        
         print("")
         print("0. Sair")
         print("")
@@ -748,6 +826,10 @@ def menu():
         elif option == "21": most_watched_ads()
         elif option == "22": most_watched_ads_by_year()
         elif option == "23": plot_ads_total()
+        elif option == "24": plot_videos_by_hour()
+        elif option == "25": plot_videos_by_weekday()
+        elif option == "26": plot_videos_by_day_of_month()
+        elif option == "27": plot_videos_by_month()
         else: print("Opção inválida. Tente novamente.")
 
 def main():
