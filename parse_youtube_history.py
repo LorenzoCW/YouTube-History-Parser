@@ -18,11 +18,26 @@ meses = {
     "set.": "Sep", "out.": "Oct", "nov.": "Nov", "dez.": "Dec"
 }
 
+
+def line():
+    print("-" * 100)
+
+
 def save_results_records(total_records): # Debug
     """
-    Salva os primeiros X registros em um arquivo TXT para analisar
-    """
+    Save a subset of record dictionaries to a file for debugging purposes.
 
+    This function takes a list of record dictionaries and, if the list is not empty,
+    saves up to 30,000 of these records into a text file named "saved_records.txt".
+    Each record is written with a header (e.g. "Record 1:") followed by each key-value pair,
+    and an extra newline for separation. A debug message with the number of saved records is printed.
+
+    Parameters:
+        total_records (list): List of dictionaries, where each dictionary represents a record.
+
+    Returns:
+        None
+    """
     if total_records:
         num_records_to_save = 30000
         records_to_save = total_records[:num_records_to_save]
@@ -36,25 +51,58 @@ def save_results_records(total_records): # Debug
         
         print(f"  [Debug]: Saved the first {len(records_to_save)} records in 'saved_records.txt'.")
 
-def line():
-    print("-" * 100)
 
 def sort(records_to_sort):
+    """
+    Sort a list of record dictionaries by their view date.
+
+    The records are assumed to have a key "view_date" that contains a datetime object.
+    The function returns a new list of records sorted in ascending order based on the "view_date" field.
+
+    Parameters:
+        records_to_sort (list): List of record dictionaries to sort.
+
+    Returns:
+        list: Sorted list of record dictionaries.
+    """
     sorted_records = sorted(records_to_sort, key=lambda x: x["view_date"])
     return sorted_records
 
+
 def record_without_ad(r):
+    """
+    Check if a record does not contain advertisement information.
+
+    This function verifies if the string "From Google Ads" is absent from the record's 
+    "details" value. If the substring is not found, the function returns True,
+    indicating that the record is not an advertisement.
+
+    Parameters:
+        r (dict): A record dictionary that is expected to have a "details" key.
+
+    Returns:
+        bool: True if the record does not contain ad-related details, False otherwise.
+    """
     if "From Google Ads" not in r.get("details", ""):
         return True
     return False
 
+
 def convert_date(date_str):
     """
-    Converte uma string de data do formato: 
-    "9 de set. de 2024, 22:16:56 BRT"
-    para um objeto datetime.
-    """
+    Convert a formatted date string into a datetime object.
 
+    The function removes the timezone "BRT" from the string, then uses a regular expression
+    to extract the day, abbreviated month in Brazilian Portuguese, year, and time.
+    It converts the month to its English abbreviated form using the 'meses' mapping and attempts
+    to create and return a datetime object.
+    
+    Parameters:
+        date_str (str): Date string in the format "DD de Mês. de YYYY, HH:MM:SS" with optional "BRT".
+        
+    Returns:
+        datetime or None: A datetime object representing the converted date, or None if conversion fails.
+    """
     # Remove o fuso horário e quebra a string
     date_str = date_str.replace("BRT", "").strip()
     # Expressão regular para extrair dia, mês e ano, e horário
@@ -70,10 +118,20 @@ def convert_date(date_str):
             print(f"Erro ao converter data '{formatted_date}': {e}")
     return None
 
+
 def format_date(date_str):
     """
-    Recebe uma data no formato "5 de set. de 2018, 21:45:55" 
-    e retorna com o dia com dois dígitos, por exemplo, "05 de set. de 2018, 21:45:55".
+    Format a date string by ensuring the day is zero-padded if necessary.
+
+    The function expects the date string to contain a comma separating the date and time.
+    It splits the string to isolate the day component and zero-pads the day if it is only one digit.
+    If the string does not follow the expected format, the original string is returned.
+
+    Parameters:
+        date_str (str): A date string in the format "D de ... , time".
+
+    Returns:
+        str: The formatted date string, or the original string if the format is unexpected.
     """
     # Separa a data e a hora pela vírgula
     try:
@@ -93,9 +151,30 @@ def format_date(date_str):
     # Reconstrói a data
     return f"{dia_formatado} de {resto},{hora}"
 
+
 def parse_single_record(cell_html):
-    """ Processa um registro para extração de dados. """
+    """
+    Parse an HTML snippet to extract video record details.
+
+    This function uses BeautifulSoup to parse the provided HTML (cell_html), searching for specific
+    elements that contain video details like title, link, channel information, and view date.
+    It extracts the video title, video link, channel name, channel link, the raw view date string,
+    its converted datetime form, and additional details if present.
     
+    Parameters:
+        cell_html (str): A string containing HTML of a single record cell.
+
+    Returns:
+        dict or None: A dictionary with the extracted fields:
+            - "video_title"
+            - "video_link"
+            - "channel_name"
+            - "channel_link"
+            - "view_date"
+            - "view_date_str"
+            - "details"
+        or None if the necessary elements cannot be found.
+    """
     outer = BeautifulSoup(cell_html, "lxml")
     
     content_cells = outer.find_all("div", class_="content-cell")
@@ -148,14 +227,22 @@ def parse_single_record(cell_html):
         "details": details
     }
 
+
 def parse_html(file_path):
     """
-    Lê o arquivo HTML do histórico e extrai os dados de cada visualização.
-    Retorna uma lista de dicionários com as chaves:
-      'video_title', 'video_link', 'channel_name', 'channel_link', 'view_date' (datetime),
-      'view_date_str' e 'details'
-    """
+    Parse an HTML file to extract all video records.
 
+    This function reads an HTML file from the given file path, processes the file using BeautifulSoup,
+    and extracts all elements with the class "outer-cell". Each cell is parsed by the parse_single_record function
+    using a multiprocessing pool with a progress bar (via tqdm). After filtering out any None records, the function
+    optionally saves the records for debugging (if configured) and prints the processing time.
+
+    Parameters:
+        file_path (str): The path to the HTML file containing the records.
+
+    Returns:
+        list: A list of record dictionaries extracted from the file.
+    """
     start_time = time.time()
 
     with open(file_path, encoding="utf-8") as f:
@@ -169,7 +256,8 @@ def parse_html(file_path):
     records = [records for records in records if records is not None]
     
     # Change to True to test if it works
-    if False: save_results_records(records)
+    if False: 
+        save_results_records(records)
 
     end_time = time.time()
     elapsed_time = end_time - start_time
@@ -179,12 +267,18 @@ def parse_html(file_path):
     
     return records
 
+
 def list_first_videos(): # 1
     """
-    Retorna os primeiros uma quantidade de vídeos assistidos (ordem cronológica),
-    considerando apenas os registros que são do YouTube.
-    """
+    List the first N videos (excluding ads) sorted by view date.
 
+    Prompts the user for the number of records to list, filters out any advertisement records,
+    sorts the remaining records by view date, and then prints a formatted list with the view date,
+    video title, and channel name. The formatting is adjusted using the format_date function.
+
+    Returns:
+        None
+    """
     quantity = int(input("Quantidade de registros para listar: "))
 
     filtered_records = [
@@ -199,12 +293,18 @@ def list_first_videos(): # 1
         print(f"{formatted_date} - {r['video_title']} ({r['channel_name']})")
     line()
 
+
 def list_first_videos_by_year(): # 2
     """
-    Para cada ano, retorna os primeiros 'quantidade' vídeos assistidos.
-    Retorna um dicionário {ano: [lista de registros]}.
-    """
+    List the first N videos per year (excluding ads) sorted by view date.
 
+    The function prompts the user for the number of records to list for each year.
+    It groups the records by year (using the "view_date" field), sorts each yearly group,
+    and then prints the results in a structured format, displaying the year and corresponding videos.
+
+    Returns:
+        None
+    """
     quantity = int(input("Quantidade de registros por ano para listar: "))
 
     date_by_year = defaultdict(list)
@@ -223,13 +323,18 @@ def list_first_videos_by_year(): # 2
             print(f"  {formatted_date} - {r['video_title']} ({r['channel_name']})")
     line()
 
+
 def list_by_channel(): # 3
     """
-    Filtra os registros cujo nome do canal contenha o nome do canal (case insensitive),
-    ordena os vídeos por data de visualização (mais antigos primeiro),
-    e retorna os primeiros 'quantidade' vídeos.
-    """
+    List videos from a specified channel.
 
+    Prompts the user for a channel name or part of it as well as the desired number of records.
+    Filters records to include only those where the channel name contains the provided substring (case-insensitive),
+    sorts the filtered list by view date, and then prints each video's formatted view date, title, and channel name.
+
+    Returns:
+        None
+    """
     channel = input("Nome (ou parte do nome) do canal: ")
     quantity = int(input("Quantidade para listar: "))
     
@@ -242,12 +347,17 @@ def list_by_channel(): # 3
         print(f"{formatted_date} - {r['video_title']} ({r['channel_name']})")
     line()
 
+
 def most_watched_videos(): # 4
     """
-    Conta quantas vezes cada vídeo foi assistido (com base no título)
-    e retorna uma lista dos vídeos mais assistidos com contagem.
+    Display the most-watched videos (excluding ads) based on the number of occurrences.
+
+    Prompts the user for how many top records to list, counts the frequency of each video title in the filtered records,
+    and then prints each title with the count of how many times it was watched.
+
+    Returns:
+        None
     """
-    
     quantity = int(input("Quantidade de registros para listar: "))
 
     filtered_records = [
@@ -262,12 +372,17 @@ def most_watched_videos(): # 4
         print(f"{count:02d} vezes - {title}")
     line()
 
+
 def most_watched_videos_by_year(): # 5
     """
-    Para cada ano, conta os vídeos mais assistidos.
-    Retorna um dicionário {ano: [(video_title, count), ...]}.
-    """
+    Display the most-watched videos for each year (excluding ads).
 
+    Prompts the user for the number of top records per year to list.
+    Groups video titles by the year of the view date, counts the frequency within each group, and prints the most common videos per year.
+
+    Returns:
+        None
+    """
     quantity = int(input("Quantidade de registros para listar: "))
 
     date_by_year = defaultdict(list)
@@ -287,11 +402,17 @@ def most_watched_videos_by_year(): # 5
             print(f"  {count:02d} vezes - {titulo}")
     line()
 
+
 def most_watched_channels(): # 6
     """
-    Conta quantas vezes cada canal aparece e retorna os canais mais assistidos.
-    """
+    List the most-watched channels (excluding ads) based on view counts.
 
+    Prompts the user for the number of top channels to list, counts the frequency of each channel name from the records,
+    and then prints each channel with its corresponding watch count.
+
+    Returns:
+        None
+    """
     quantity = int(input("Quantidade de registros para listar: "))
     
     filtered_records = [
@@ -306,11 +427,17 @@ def most_watched_channels(): # 6
         print(f"{channel} - {count} vezes")
     line()
 
+
 def most_watched_channels_by_year(): # 7
     """
-    Para cada ano, conta quantos vídeos foram assistidos por cada canal.
-    """
+    List the most-watched channels for each year (excluding ads).
 
+    Prompts the user for the number of top channels per year, groups records by year,
+    counts the frequency of channel names within each year, and prints the top channels along with their counts.
+
+    Returns:
+        None
+    """
     quantity = int(input("Quantidade de registros para listar: "))
     
     date_by_year = defaultdict(list)
@@ -330,11 +457,17 @@ def most_watched_channels_by_year(): # 7
             print(f"  {channel} - {count} vezes")
     line()
 
+
 def most_watched_days(): # 8
     """
-    Conta quantos vídeos foram assistidos em cada dia (data completa) e retorna os dias com mais vídeos.
-    """
+    List the days with the highest number of videos watched (excluding ads).
 
+    Prompts the user for how many top days to list, counts the number of videos watched per day (formatted as YYYY-MM-DD),
+    and then prints the dates along with the count of videos.
+
+    Returns:
+        None
+    """
     quantity = int(input("Quantidade de registros para listar: "))
     
     count = Counter()
@@ -349,12 +482,18 @@ def most_watched_days(): # 8
         print(f"{date} - {count} vídeos")
     line()
 
+
 def most_watched_days_by_year(): # 9
     """
-    Para cada ano, conta os dias (data completa) com mais vídeos assistidos.
-    Retorna um dicionário {ano: [(data, count), ...]}.
-    """
+    List the most active viewing days for each year (excluding ads).
 
+    Prompts the user for the number of top records to list per year,
+    groups the records by year and then by day, counts video frequencies per day,
+    and prints the top days with the number of videos for each year.
+
+    Returns:
+        None
+    """
     quantity = int(input("Quantidade de registros para listar: "))
 
     date_by_year = defaultdict(list)
@@ -375,12 +514,18 @@ def most_watched_days_by_year(): # 9
             print(f"  {date} - {count} vídeos")
     line()
 
+
 def list_videos_by_date(): # 10
     """
-    Vídeos de uma data: Lista todos os vídeos (e o canal a que pertencem) de uma data especificada.
-    No início, exibe a quantidade de vídeos encontrados.
-    """
+    List all videos (excluding ads) for a specific date.
 
+    Prompts the user to input a date in the format YYYY-MM-DD. Converts the string to a datetime object,
+    filters the records to those matching the target date, sorts them by view date,
+    and prints each video's information along with the total number of videos watched on that date.
+
+    Returns:
+        None
+    """
     date_str = input("Data para listar (YYYY-MM-DD): ").strip()
     
     # Converte a string para objeto datetime.date
@@ -396,12 +541,18 @@ def list_videos_by_date(): # 10
         print(f"{r['view_date_str']} - {r['video_title']} ({r['channel_name']})")
     line()
 
+
 def list_channels_by_date(): # 11
     """
-    Canais de uma data: Lista todos os canais acessados em um dia especificado.
-    No início, exibe a quantidade de canais únicos encontrados.
-    """
+    List all unique channels for videos watched on a specific date.
 
+    Prompts the user to input a date (YYYY-MM-DD), converts the string to a datetime.date object,
+    and then filters and groups records (excluding ads) by that date. Prints the channel names and links,
+    along with the total count of unique channels viewed on the specified date.
+
+    Returns:
+        None
+    """
     date_str = input("Data para listar (YYYY-MM-DD): ").strip()
 
     target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
@@ -419,18 +570,18 @@ def list_channels_by_date(): # 11
         print(f"{channel['channel_name']} - {channel['channel_link']}")
     line()
 
+
 def search_by_title(): # 12
     """
-    Busca vídeos cujo título contenha os termos especificados e retorna os resultados
-    em ordem crescente de data de visualização.
-    
-    A query pode conter grupos de termos separados por vírgula.
-    Em cada grupo, os termos separados por espaço serão combinados com condição AND,
-    ou seja, o vídeo deve conter todos os termos do grupo (case insensitive).
-    Se houver mais de um grupo, a condição entre os grupos é OR,
-    ou seja, o vídeo será considerado se satisfizer pelo menos um grupo.
-    """
+    Search for videos by keywords in their title.
 
+    Prompts the user for search terms separated by spaces and groups (separated by commas).
+    The function then filters the records (excluding ads) to those whose titles contain all the terms
+    of at least one group. The matching records are sorted by view date and printed along with the total count found.
+
+    Returns:
+        None
+    """
     query = input("Termos para buscar no título (separados por espaço, e termos diferentes separados por vírgula): ").strip()
     
     query = query.strip()
@@ -451,16 +602,26 @@ def search_by_title(): # 12
     results = sort(results)
 
     line()
-    print(f"Total de vídeos encontrados: {len(results)}")
     for r in results:
         print(f"{r['view_date_str']} - {r['video_title']} ({r['channel_name']})")
+    print(f"Total de vídeos encontrados: {len(results)}")
     line()
+
 
 def plot_videos_day(): # 13
     """
-    Vídeos por dia: exibe quantidade total e gráfico com contagem por título
-    """
+    Plot a bar chart of videos watched on a specific day.
 
+    Prompts the user for a date (YYYY-MM-DD), retrieves the videos for that day by calling list_videos_by_date,
+    and then prints the total videos watched on that date. It also counts the occurrences of each video title and plots
+    a bar chart using Plotly Express.
+
+    Note:
+        The function list_videos_by_date() is called and is expected to return the list of videos.
+
+    Returns:
+        None
+    """
     date_str = input("Data para listar (YYYY-MM-DD): ").strip()
     
     videos = list_videos_by_date()
@@ -474,11 +635,18 @@ def plot_videos_day(): # 13
     fig = px.bar(graph_data, x="Video title", y="Count", title=f"Vídeos assistidos em {date_str}")
     fig.show()
 
+
 def plot_videos_month(): # 14
     """
-    Vídeos por mês: exibe quantidade total e gráfico com contagem por dia
+    Plot a bar chart of videos watched per day within a specified month.
+
+    Prompts the user for a month in the format YYYY-MM, filters records to that month (excluding ads),
+    and prints the total number of videos watched. It then counts the number of videos watched on each day and
+    generates a bar chart using Plotly Express.
+
+    Returns:
+        None
     """
-    
     month_str = input("Mês para listar (YYYY-MM): ").strip()
     
     month_records = [r for r in records if r["view_date"].strftime("%Y-%m") == month_str and record_without_ad(r)]
@@ -492,11 +660,19 @@ def plot_videos_month(): # 14
     fig = px.bar(graph_data, x="Day", y="Count", title=f"Vídeos assistidos por dia em {month_str}")
     fig.show()
 
+
 def plot_videos_year(): # 15
     """
-    Vídeos por ano: exibe quantidade total e gráfico com contagem por mês
+    Plot bar charts of videos watched per month and total for a specified year.
+
+    Prompts the user for a year (YYYY), filters the records to that year (excluding ads), and prints the total count.
+    It then generates two bar charts using Plotly Express:
+      1. Videos watched per month (aggregated by YYYY-MM).
+      2. Videos watched per year.
+
+    Returns:
+        None
     """
-    
     year_str = input("Ano para listar (YYYY): ").strip()
 
     year_records = [r for r in records if r["view_date"].year == int(year_str) and record_without_ad(r)]
@@ -510,11 +686,19 @@ def plot_videos_year(): # 15
     fig = px.bar(graph_data, x="Month", y="Count", title=f"Vídeos assistidos por mês em {year_str}")
     fig.show()
 
+
 def plot_videos_total(): # 16
     """
-    Vídeos totais: exibe quantidade total e gráficos por mês (ano-mês) e por ano
+    Plot overall bar charts for total videos watched (excluding ads).
+
+    The function first prints the total number of videos watched.
+    It then generates two bar charts using Plotly Express:
+      1. Videos watched per Year-Month.
+      2. Videos watched per Year.
+
+    Returns:
+        None
     """
-    
     filtered_records = [r for r in records if record_without_ad(r)]
     total = len(filtered_records)
     line()
@@ -531,11 +715,18 @@ def plot_videos_total(): # 16
     fig2 = px.bar(year_data, x="Year", y="Count", title="Vídeos assistidos por Ano")
     fig2.show()
 
+
 def plot_channels_day(): # 17
     """
-    Canais por dia: exibe quantidade total de canais únicos e gráfico com contagem por canal
+    Plot a bar chart of channels accessed on a specific day.
+
+    Prompts the user for a specific date (YYYY-MM-DD), retrieves the videos for that day,
+    then aggregates and counts the number of videos per channel. A bar chart is generated using Plotly Express
+    to show the frequency of each channel accessed.
+
+    Returns:
+        None
     """
-    
     date_str = input("Data para listar (YYYY-MM-DD): ").strip()
 
     videos = list_videos_by_date()
@@ -554,11 +745,18 @@ def plot_channels_day(): # 17
     fig = px.bar(graph_data, x="Channel", y="Frequency", title=f"Canais acessados em {date_str}")
     fig.show()
 
+
 def plot_channels_month(): # 18
     """
-    Canais por mês: exibe quantidade total (únicos por dia) e gráfico com contagem por dia
+    Plot a bar chart of unique channels watched per day in a specified month.
+
+    Prompts the user for a month in the format YYYY-MM, filters the records (excluding ads) for that month,
+    and aggregates unique channels per day. It then prints the total number of channels viewed in that month and
+    displays a bar chart using Plotly Express.
+
+    Returns:
+        None
     """
-    
     month_str = input("Mês para listar (YYYY-MM): ").strip()
 
     month_records = [r for r in records if r["view_date"].strftime("%Y-%m") == month_str and record_without_ad(r)]
@@ -575,11 +773,18 @@ def plot_channels_month(): # 18
     fig = px.bar(graph_data, x="Day", y="Unique Channels", title=f"Canais únicos por dia em {month_str}")
     fig.show()
 
+
 def plot_channels_year(): # 19
     """
-    Canais por ano: exibe quantidade total (únicos por mês) e gráfico com contagem por mês
+    Plot a bar chart of unique channels watched per month in a specified year.
+
+    Prompts the user for a year (YYYY), filters records for that year (excluding ads),
+    and groups them by month, aggregating unique channel names for each month.
+    The chart is generated using Plotly Express.
+
+    Returns:
+        None
     """
-    
     year_str = input("Ano para listar (YYYY): ").strip()
 
     year_records = [r for r in records if r["view_date"].year == int(year_str) and record_without_ad(r)]
@@ -596,11 +801,19 @@ def plot_channels_year(): # 19
     fig = px.bar(graph_data, x="Month", y="Unique Channels", title=f"Canais únicos por mês em {year_str}")
     fig.show()
 
+
 def plot_channels_total(): # 20
     """
-    Canais totais: exibe quantidade total de canais únicos e gráficos por Ano-Mês e Ano
+    Plot overall bar charts for unique channels watched across all records (excluding ads).
+
+    The function calculates the total number of unique channels watched.
+    It then generates two bar charts using Plotly Express:
+      1. Unique channels per Year-Month.
+      2. Unique channels per Year.
+
+    Returns:
+        None
     """
-    
     filtered_records = [r for r in records if record_without_ad(r)]
 
     total_channels = set(r["channel_name"] for r in filtered_records)
@@ -624,10 +837,16 @@ def plot_channels_total(): # 20
     fig2 = px.bar(year_data, x="Year", y="Unique Channels", title="Canais únicos por Ano")
     fig2.show()
 
+
 def most_watched_ads(): # 21
     """
-    Conta quantas vezes cada propaganda foi assistida (com base no título)
-    e retorna uma lista das propagandas mais assistidas com contagem.
+    List the most-watched advertisements based on watch frequency.
+
+    Prompts the user for the number of top records to list. This function filters for records that contain ad content
+    (i.e. where record_without_ad returns False), counts the occurrences of each ad video title, and prints the results.
+
+    Returns:
+        None
     """
     quantity = int(input("Quantidade de registros para listar: "))
     ads_filtered_records = [r for r in records if not record_without_ad(r)]
@@ -639,10 +858,16 @@ def most_watched_ads(): # 21
         print(f"{cnt:02d} vezes - {title}")
     line()
 
+
 def most_watched_ads_by_year(): # 22
     """
-    Para cada ano, conta as propagandas mais assistidas.
-    Retorna um dicionário {ano: [(video_title, count), ...]}.
+    List the most-watched advertisements per year based on watch frequency.
+
+    Prompts the user for the number of top records to list. The function groups records containing ad content by year,
+    counts the frequency of each ad video title in each year, and prints the top ads along with their counts for every year.
+
+    Returns:
+        None
     """
     quantity = int(input("Quantidade de registros para listar: "))
     ads_by_year = defaultdict(list)
@@ -662,10 +887,18 @@ def most_watched_ads_by_year(): # 22
             print(f"  {cnt:02d} vezes - {title}")
     line()
 
+
 def plot_ads_total(): # 23
     """
-    Propagandas totais: exibe a quantidade total de propagandas (registros que contém 'From Google Ads'),
-    sua porcentagem em relação ao total de registros e gráficos por mês (ano-mês) e por ano.
+    Plot bar charts for total advertisement watches.
+
+    This function calculates and prints the total number of advertisement records and its percentage from the overall records.
+    It generates two bar charts using Plotly Express:
+      1. Ads watched per Year-Month.
+      2. Ads watched per Year.
+
+    Returns:
+        None
     """
     total_records = len(records)
     ads_records = [r for r in records if not record_without_ad(r)]
@@ -687,9 +920,16 @@ def plot_ads_total(): # 23
     fig2 = px.bar(year_data_ads, x="Year", y="Count", title="Propagandas assistidas por Ano")
     fig2.show()
 
+
 def plot_videos_by_hour(): # 24
     """
-    Exibe um gráfico de barras com a contagem de vídeos assistidos por hora do dia.
+    Plot a bar chart of videos watched by each hour of the day.
+
+    The function extracts the hour from the view date of each record (if available),
+    counts the number of videos for each hour (0-23), and then uses Plotly Express to create a bar chart.
+
+    Returns:
+        None
     """
     # Extrai a hora de cada visualização (0-23)
     hour_count = Counter(r["view_date"].hour for r in records if r["view_date"] is not None)
@@ -702,9 +942,16 @@ def plot_videos_by_hour(): # 24
                  labels={"Hour": "Hora do Dia", "Count": "Quantidade de Vídeos"})
     fig.show()
 
+
 def plot_videos_by_weekday(): # 25
     """
-    Exibe um gráfico de barras com a contagem de vídeos assistidos por dia da semana.
+    Plot a bar chart of videos watched by weekday.
+
+    The function maps weekday numbers (0 for Monday through 6 for Sunday) to their names, counts the number
+    of videos watched on each weekday (excluding records without a valid view_date), and plots the results with Plotly Express.
+
+    Returns:
+        None
     """
     # Mapeamento dos números dos dias (0=segunda, 6=domingo) para nomes
     weekday_names = {0: "Segunda", 1: "Terça", 2: "Quarta", 3: "Quinta",
@@ -719,9 +966,16 @@ def plot_videos_by_weekday(): # 25
                  labels={"Weekday": "Dia da Semana", "Count": "Quantidade de Vídeos"})
     fig.show()
 
+
 def plot_videos_by_day_of_month(): # 26
     """
-    Exibe um gráfico de barras com a contagem de vídeos assistidos por dia do mês.
+    Plot a bar chart of videos watched for each day of the month.
+
+    Extracts the day of the month (1 to 31) from each record's view date,
+    counts the number of videos for each day, and displays the data using Plotly Express.
+
+    Returns:
+        None
     """
     # Dia do mês varia de 1 a 31
     day_count = Counter(r["view_date"].day for r in records if r["view_date"] is not None)
@@ -733,9 +987,16 @@ def plot_videos_by_day_of_month(): # 26
                  labels={"Day": "Dia do Mês", "Count": "Quantidade de Vídeos"})
     fig.show()
 
+
 def plot_videos_by_month(): # 27
     """
-    Exibe um gráfico de barras com a contagem de vídeos assistidos por mês.
+    Plot a bar chart of videos watched by month.
+
+    Extracts the month number (1-12) from each record's view date, maps it to its corresponding
+    abbreviated month name, counts the number of videos for each month, and displays the bar chart via Plotly Express.
+
+    Returns:
+        None
     """
     # Extrai o número do mês (1 a 12) e mapeia para o nome abreviado
     month_names = {1: "Jan", 2: "Fev", 3: "Mar", 4: "Abr", 5: "Mai", 6: "Jun",
