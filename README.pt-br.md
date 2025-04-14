@@ -1,6 +1,6 @@
 # Analisador de Histórico do YouTube para o Google Takeout
 
-Este é um script em Python para processar o histórico de visualizações do YouTube extraído via Google Takeout. O programa extrai detalhes de cada registro (como título, link, data de visualização, canal, etc.) utilizando o BeautifulSoup. Em seguida, organiza esses dados para a visualização de estatísticas e gráficos sobre a atividade, como os vídeos mais assistidos, canais mais acessados, tendências de visualização por data, entre outros.
+Este é um script em Python para processar o histórico de visualizações do YouTube extraído via Google Takeout. O programa extrai detalhes de cada registro - como título, link, data de visualização, canal, entre outros - utilizando BeautifulSoup.. Em seguida, organiza esses dados para a visualização de estatísticas e gráficos sobre a atividade, como os vídeos mais assistidos, canais mais acessados, tendências de visualização por data, entre outros.
 
 ### Leia em:  [![en](https://img.shields.io/badge/lang-en-red.svg)](https://github.com/LorenzoCW/YouTube-History-Parser/blob/main/README.md)
 
@@ -11,7 +11,7 @@ Este é um script em Python para processar o histórico de visualizações do Yo
 - Lista os primeiros vídeos assistidos (com opção de filtragem por ano ou canal).  
 - Exibe os vídeos e canais mais assistidos, tanto de forma geral quanto segmentada por ano ou data.  
 - Pesquisas por palavras-chave para título de vídeos.
-- Gera gráficos para visualizar tendências diárias, mensais, e anuais de vídeos e canais assistidos e análises específicas sobre horários, dias da semana e propagandas.
+- Gera gráficos para visualizar tendências diárias, mensais, e anuais de vídeos e canais assistidos e análises específicas sobre horários, dias da semana e anúncios.
 
 ## Requisitos
 
@@ -44,10 +44,10 @@ Este é um script em Python para processar o histórico de visualizações do Yo
 ## Uso
 
 1. **Preparação do Arquivo HTML:**  
-    - Acesse [takeout.google.com](takeout.google.com).
+    - Acesse [takeout.google.com](https://takeout.google.com).
     - Escolha a conta clicando no ícone do canto superior direito.
-    - Selecione apenas YouTube e clique Próxima etapa.
-    - Deixe para exportar uma vez, e para o email (formato zip e tamanho 2GB).
+    - Selecione apenas YouTube e clique em Próxima etapa.
+    - Defina para exportar uma vez e escolha o envio por e-mail (formato zip e tamanho 2GB).
     - E depois clique em "Criar exportação".
     - Espere em torno de 5 minutos e baixe o arquivo do email.
     - Extraia a pasta "Takeout" para o diretório raiz do projeto.
@@ -62,7 +62,8 @@ Este é um script em Python para processar o histórico de visualizações do Yo
    - Após o processamento dos registros, o script exibirá um menu com diversas opções de análise.
    - Digite o número correspondente à análise desejada e siga as instruções apresentadas.
 
-## Funções:
+## Funcionalidades disponíveis
+
 #### Primeiros vídeos
 1 - Primeiros vídeos assistidos
 > Lista os primeiros N vídeos (excluindo anúncios) ordenados pela data de visualização.
@@ -129,14 +130,14 @@ Quantidade de canais
 20 - Quantidade de canais totais (com gráficos por mês e ano)
 > Gera gráficos de barras gerais com os canais únicos assistidos em todo o período (excluindo anúncios).
 
-#### Propagandas
-21 - Propagandas mais assistidas
+#### Anúncios
+21 - Anúncios mais assistidos
 > Liste os anúncios mais assistidos com base na frequência de exibição.
 
-22 - Propagandas mais assistidas por ano
+22 - Anúncios mais assistidos por ano
 > Liste os anúncios mais assistidos por ano com base na frequência de exibição.
 
-23 - Quantidade total de propagandas (com gráficos por mês e ano)
+23 - Quantidade total de Anúncios (com gráficos por mês e ano)
 > Gera gráficos de barras com o total de visualizações de anúncios.
 
 #### Tendências

@@ -1,6 +1,6 @@
 # YouTube History Parser for Google Takeout
 
-This is a Python script for processing YouTube viewing history extracted via Google Takeout. The program extracts details from each record (such as title, link, view date, channel, etc.) using BeautifulSoup. It then organizes this data for visualizing statistics and graphs about the activity, such as the most watched videos, the most accessed channels, viewing trends by date, among others.
+This is a Python script for processing YouTube viewing history extracted via Google Takeout. The program extracts details from each record (such as title, link, view date, channel, etc.) using BeautifulSoup. It then organizes this data for visualizing statistics and graphs about the activity, such as the most watched videos, the most accessed channels, viewing trends by date, and more.
 
 ### Read in:  [![pt-br](https://img.shields.io/badge/lang-pt--br-green.svg)](https://github.com/LorenzoCW/YouTube-History-Parser/blob/main/README.pt-br.md)
 
@@ -9,7 +9,7 @@ This is a Python script for processing YouTube viewing history extracted via Goo
 - Reads the viewing history file and extracts relevant data such as video title, link, channel name, view date, and other details.
 - Excludes records considered as advertisements.  
 - Lists the first watched videos (with options to filter by year or channel).  
-- Displays the most watched videos and channels, both overall and segmented by year or date.  
+- Displays the most-watched videos and channels, both overall and segmented by year or date.  
 - Searches for keywords in video titles.
 - Generates graphs to visualize daily, monthly, and yearly trends of watched videos and channels and specific analyses on timings, days of the week, and advertisements.
 
@@ -44,10 +44,10 @@ This is a Python script for processing YouTube viewing history extracted via Goo
 ## Usage
 
 1. **Preparing the HTML File:**  
-    - Go to [takeout.google.com](takeout.google.com).
+    - Go to [takeout.google.com](https://takeout.google.com).
     - Choose the account by clicking the icon at the top right corner.
     - Select only YouTube and click Next step.
-    - Set to export once, and to email (zip format and 2GB size).
+    - Set to export once, and choose delivery via email (zip format and 2GB size).
     - Then click on "Create export".
     - Wait around 5 minutes and download the file from your email.
     - Extract the "Takeout" folder to the project root directory.
@@ -62,9 +62,10 @@ This is a Python script for processing YouTube viewing history extracted via Goo
    - After processing the records, the script will display a menu with various analysis options.
    - Type the number corresponding to the desired analysis and follow the presented instructions.
 
-## Functions
+## Available features
+
 #### First videos
-1 - First videos eatched
+1 - First videos watched
 > List the first N videos (excluding ads) sorted by view date.
 
 2 - First videos watched per year
